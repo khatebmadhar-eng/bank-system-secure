@@ -1,6 +1,6 @@
 import os
 import sqlite3
-import requests  # لإرسال التنبيهات الفورية
+import requests  
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -8,16 +8,13 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
-# 🔑 مفتاح سري عشوائي لتشفير بيانات الجلسات ومنع تزويرها
 app.secret_key = os.urandom(24)
 
-# 🔒 إعدادات أمان الكوكيز المعتمدة مصرفياً ضد ثغرات XSS و CSRF
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE='Lax'
 )
 
-# 🧱 تفعيل نظام Rate Limiting لحماية السيرفر من هجمات حجب الخدمة (DoS) والتخمين
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -26,16 +23,14 @@ limiter = Limiter(
 )
 
 DATABASE = 'bank_secure.db'
-STATIC_INTRUDER_IMG = '/static/intruders/default_hacker.jpg'  # المصيدة الرمزية
+STATIC_INTRUDER_IMG = '/static/intruders/default_hacker.jpg'  
 
 def send_security_alert(ip, username, action):
     """📢 دالة بنكية لإرسال تنبيه فوري لفريق الأمن (تليجرام / بريد إلكتروني)"""
-    # يمكنك وضع الـ Token والـ Chat ID الخاص بك هنا لتفعيل التنبيه على هاتفك فوراً
     bot_token = "YOUR_BOT_TOKEN"
     chat_id = "YOUR_CHAT_ID"
     message = f"⚠️ **تنبيه أمني عاجل - رادار البنك** ⚠️\n\n🌐 مصدر الهجوم (IP): {ip}\n👤 المدخل المستخدم: {username}\n🛡️ إجراء النظام: {action}"
     
-    # مجهزة للعمل فور وضع البيانات الصحيحة للـ Bot
     if bot_token != "YOUR_BOT_TOKEN":
         try:
             url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
@@ -69,7 +64,6 @@ def init_db():
         )
     ''')
 
-    # 🔐 تشفيـر كلمة المرور "123" لحساب مظهر لحمايتها من التسريب (PBKDF2-SHA256)
     hashed_pw = generate_password_hash("123", method='pbkdf2:sha256')
     cursor.execute("INSERT OR IGNORE INTO users VALUES (?, ?, ?, ?, ?)", 
                    ('mazhar_cyber', 'مظهر', hashed_pw, 'عميل متميز (VIP)', 'حساب استثماري نشط'))
@@ -95,13 +89,11 @@ def login():
         password = request.form.get('password', '').strip()
         ip_addr = request.remote_addr
 
-        # 🧱 جدار حماية التطبيق (WAF) لرصد وحجب ثغرات حقن كود SQL
         malicious_patterns = ["'", '"', "--", "OR", "AND", "or", "and", "SELECT", "select"]
         if any(pattern in username for pattern in malicious_patterns) or any(pattern in password for pattern in malicious_patterns):
             
             action = "❌ محاولة اختراق محجوبة (حقن ثغرة SQLi)"
             
-            # تسجيل الهجوم وإرسال تنبيه فوري
             conn = get_db_connection()
             conn.execute("INSERT INTO security_logs (ip_address, username_entered, action_taken, image_path) VALUES (?, ?, ?, ?)",
                          (ip_addr, username, action, STATIC_INTRUDER_IMG))
@@ -111,12 +103,10 @@ def login():
             send_security_alert(ip_addr, username, action)
             return "... تم حظر محاولتك بنجاح. تم تسجيل هويتك الرقمية وصورتك في رادار نظام المؤسسة 403 ⚠️"
 
-        # 🛡️ الاستعلام المجهز الآمن (Parameterized Queries) المعتمد من البنوك لمنع الـ Injection تماماً
         conn = get_db_connection()
         user = conn.execute("SELECT * FROM users WHERE id = ?", (username,)).fetchone()
         conn.close()
 
-        # 🔐 التحقق المشفر والآمن من كلمة المرور
         if user and check_password_hash(user['password_hash'], password):
             session.clear()
             session['user_id'] = user['id']
